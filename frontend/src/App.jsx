@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, TrendingUp, Target, Award, Play, Activity, CheckCircle2, XCircle, CheckCircle } from 'lucide-react';
+import { Brain, TrendingUp, Target, Award, Play, Activity, CheckCircle2, XCircle, CheckCircle, Flame, Sparkles, ChevronRight } from 'lucide-react';
 
 // Helper to handle line breaks from AI text
 const formatAIText = (text) => {
@@ -14,17 +14,12 @@ const TOTAL_QUESTIONS = 5;
 export default function App() {
   const [currentView, setCurrentView] = useState('dashboard');
   
-  // --- DASHBOARD STATE ---
   const [studentData, setStudentData] = useState({
-    name: "Harish",
-    level: "Beginner",
-    totalTests: 0, 
-    avgAccuracy: 0, 
-    streak: 0,
+    name: "Harish", level: "Prodigy", totalTests: 0, avgAccuracy: 0, streak: 12,
     skills: [
-      { name: "Python", mastery: 10, color: "from-blue-400 to-blue-600" },
-      { name: "Data Structures", mastery: 10, color: "from-emerald-400 to-emerald-600" },
-      { name: "Algorithms", mastery: 10, color: "from-purple-400 to-purple-600" },
+      { name: "Python", mastery: 10, color: "from-cyan-400 to-blue-600", shadow: "shadow-cyan-500/50" },
+      { name: "Data Structures", mastery: 10, color: "from-fuchsia-400 to-purple-600", shadow: "shadow-purple-500/50" },
+      { name: "Algorithms", mastery: 10, color: "from-emerald-400 to-teal-600", shadow: "shadow-teal-500/50" },
     ]
   });
 
@@ -132,78 +127,95 @@ export default function App() {
         }
         return skill;
       });
-
-      return {
-        ...prevData,
-        totalTests: prevData.totalTests + 1,
-        avgAccuracy: newAvgAccuracy,
-        skills: updatedSkills
-      };
+      return { ...prev, totalTests: prev.totalTests + 1, avgAccuracy: newAvgAccuracy, skills: updatedSkills };
     });
   };
 
   // --- DASHBOARD VIEW ---
   if (currentView === 'dashboard') {
     return (
-      <div className="min-h-screen bg-slate-900 text-slate-100 p-6 md:p-12 font-sans overflow-x-hidden">
-        <div className="max-w-6xl mx-auto space-y-8">
+      <div className="min-h-screen bg-[#0B0F19] text-slate-100 p-6 md:p-12 font-sans overflow-x-hidden selection:bg-fuchsia-500/30">
+        
+        {/* Background Ambient Glow */}
+        <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-fuchsia-600/20 blur-[120px] rounded-full pointer-events-none"></div>
+
+        <div className="max-w-6xl mx-auto space-y-10 relative z-10">
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-end">
             <div>
-              <h1 className="text-4xl font-extrabold text-white mb-2">Welcome back, {studentData.name}! 👋</h1>
-              <p className="text-slate-400 text-lg">Ready to level up your skills today?</p>
+              <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 mb-2 tracking-tight">
+                Welcome back, {studentData.name} <Sparkles className="inline text-fuchsia-400 mb-2" size={32}/>
+              </h1>
+              <p className="text-slate-400 text-lg font-medium">Your personalized AI learning matrix is ready.</p>
+            </div>
+            <div className="hidden md:flex items-center space-x-3 bg-slate-900/80 backdrop-blur-xl px-5 py-2.5 rounded-2xl border border-slate-700/50 shadow-[0_0_20px_rgba(0,0,0,0.3)]">
+              <Award className="text-amber-400" />
+              <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-500">{studentData.level} Tier</span>
             </div>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Dynamic Stats Grid (Staggered) */}
+          <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              { title: "Tests Completed", value: studentData.totalTests, icon: <CheckCircle2 className="text-emerald-400" size={32}/> },
-              { title: "Avg. Accuracy", value: `${studentData.avgAccuracy}%`, icon: <Target className="text-blue-400" size={32}/> },
-              { title: "Current Streak", value: `${studentData.streak} Days`, icon: <TrendingUp className="text-amber-400" size={32}/> }
+              { title: "Missions Completed", value: studentData.totalTests, icon: <CheckCircle2 className="text-cyan-400" size={28}/>, glow: "shadow-cyan-500/10" },
+              { title: "Global Accuracy", value: `${studentData.avgAccuracy}%`, icon: <Target className="text-fuchsia-400" size={28}/>, glow: "shadow-fuchsia-500/10" },
+              { title: "Learning Streak", value: `${studentData.streak} Days`, icon: <Flame className="text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)] animate-pulse" size={28}/>, glow: "shadow-orange-500/10" }
             ].map((stat, i) => (
-              <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
-                className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700/50 flex items-center justify-between"
+              <motion.div key={i} variants={slideUpItem}
+                className={`bg-slate-900/40 backdrop-blur-xl p-6 rounded-3xl border border-slate-700/50 flex items-center justify-between shadow-xl ${stat.glow} hover:bg-slate-800/60 transition-colors cursor-default`}
               >
                 <div>
-                  <p className="text-slate-400 font-medium mb-1">{stat.title}</p>
-                  <p className="text-3xl font-bold text-white">{stat.value}</p>
+                  <p className="text-slate-400 font-semibold mb-1 uppercase tracking-wider text-xs">{stat.title}</p>
+                  <p className="text-4xl font-black text-white tracking-tight">{stat.value}</p>
                 </div>
-                <div className="bg-slate-800 p-3 rounded-xl">{stat.icon}</div>
+                <div className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800 shadow-inner">{stat.icon}</div>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} 
-              className="md:col-span-2 bg-slate-800/50 p-8 rounded-3xl border border-slate-700/50"
+            {/* Neural Competency Analytics */}
+            <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }} 
+              className="md:col-span-2 bg-slate-900/40 backdrop-blur-xl p-8 rounded-[2rem] border border-slate-700/50 shadow-2xl relative overflow-hidden"
             >
-              <h2 className="text-2xl font-bold text-white mb-6 flex items-center"><Brain className="mr-3 text-indigo-400"/> Competency Analytics</h2>
-              <div className="space-y-6">
-                {studentData.skills.map((skill, index) => (
+              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-[80px] rounded-full"></div>
+              <h2 className="text-2xl font-bold text-white mb-8 flex items-center tracking-tight">
+                <Brain className="mr-3 text-cyan-400"/> Neural Mastery Matrix
+              </h2>
+              <div className="space-y-8 relative z-10">
+                {studentData.skills.map((skill) => (
                   <div key={skill.name + skill.mastery}>
-                    <div className="flex justify-between mb-2">
-                      <span className="font-semibold text-slate-300">{skill.name}</span>
-                      <span className="font-bold text-white">{skill.mastery}%</span>
+                    <div className="flex justify-between mb-3">
+                      <span className="font-bold text-slate-300 text-lg">{skill.name}</span>
+                      <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">{skill.mastery}%</span>
                     </div>
-                    <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
+                    <div className="w-full bg-slate-950 rounded-full h-4 p-1 border border-slate-800 shadow-inner">
                       <motion.div 
-                        initial={{ width: 0 }} animate={{ width: `${skill.mastery}%` }} transition={{ duration: 1.5, ease: "easeOut" }}
-                        className={`h-3 rounded-full bg-gradient-to-r ${skill.color}`}
-                      ></motion.div>
+                        initial={{ width: 0 }} animate={{ width: `${skill.mastery}%` }} transition={{ duration: 1.5, type: "spring" }}
+                        className={`h-full rounded-full bg-gradient-to-r ${skill.color} shadow-lg ${skill.shadow} relative`}
+                      >
+                         <div className="absolute top-0 right-0 bottom-0 w-10 bg-gradient-to-r from-transparent to-white/30 rounded-full"></div>
+                      </motion.div>
                     </div>
                   </div>
                 ))}
               </div>
             </motion.div>
 
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}
-              className="bg-gradient-to-b from-indigo-600 to-indigo-900 p-8 rounded-3xl border border-indigo-500/30 flex flex-col justify-center items-center text-center shadow-2xl"
+            {/* Premium Action Card */}
+            <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }}
+              className="group relative p-[1px] rounded-[2rem] overflow-hidden bg-gradient-to-b from-fuchsia-500 to-cyan-500 shadow-[0_0_40px_rgba(217,70,239,0.3)] hover:shadow-[0_0_60px_rgba(217,70,239,0.5)] transition-all duration-500"
             >
-              <div className="bg-indigo-500/30 p-4 rounded-full mb-6"><Activity size={48} className="text-indigo-200" /></div>
-              <h3 className="text-2xl font-bold text-white mb-3">Adaptive Assessment</h3>
-              <p className="text-indigo-200 mb-8 leading-relaxed">Our AI will dynamically adjust to your skill level to find your true mastery.</p>
-              <button onClick={startTest} className="w-full py-4 bg-white text-indigo-900 font-extrabold rounded-xl shadow-lg hover:scale-105 transition-transform duration-200 flex justify-center items-center">
-                <Play className="mr-2" fill="currentColor" size={20}/> Start Now
-              </button>
+              <div className="absolute inset-0 bg-gradient-to-b from-fuchsia-500 to-cyan-500 opacity-50 group-hover:opacity-100 transition-opacity duration-500"></div>
+              <div className="relative h-full bg-[#0F1423] p-8 rounded-[2rem] flex flex-col justify-center items-center text-center">
+                <motion.div animate={{ rotate: 360 }} transition={{ duration: 20, repeat: Infinity, ease: "linear" }} className="bg-gradient-to-br from-fuchsia-500/20 to-cyan-500/20 p-5 rounded-full mb-6 border border-white/10">
+                  <Activity size={48} className="text-fuchsia-400" />
+                </motion.div>
+                <h3 className="text-3xl font-black text-white mb-3 tracking-tight">Initialize Assessment</h3>
+                <p className="text-slate-400 mb-8 font-medium leading-relaxed">Our quantum AI engine will calibrate questions to your exact neural frequency in real-time.</p>
+                <button onClick={startTest} className="w-full py-5 bg-white text-[#0B0F19] font-black text-lg rounded-2xl shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:scale-105 transition-all duration-300 flex justify-center items-center group/btn">
+                  <Play className="mr-2 group-hover/btn:text-fuchsia-500 transition-colors" fill="currentColor" size={22}/> Start Test
+                </button>
+              </div>
             </motion.div>
           </div>
         </div>
@@ -224,29 +236,34 @@ export default function App() {
     }
 
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 font-sans">
-        <div className="w-full max-w-3xl flex justify-between mb-8 text-sm font-bold tracking-wide">
-          <span className="bg-slate-800 text-slate-300 px-4 py-2 rounded-lg border border-slate-700">TOPIC: <span className="text-indigo-400">{currentQuestion.topic}</span></span>
-          <span className="bg-indigo-900/40 text-indigo-300 px-4 py-2 rounded-lg border border-indigo-700/50">LVL: {currentQuestion.difficulty}</span>
+      <div className="min-h-screen bg-[#0B0F19] flex flex-col items-center justify-center p-6 font-sans selection:bg-cyan-500/30">
+        <div className="fixed top-0 left-0 w-full h-1.5 bg-slate-800">
+           <motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }} className="h-full bg-gradient-to-r from-fuchsia-500 to-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.8)]"></motion.div>
         </div>
-        <div className="w-full max-w-3xl relative overflow-hidden">
+
+        <div className="w-full max-w-3xl flex justify-between mb-8 text-sm font-bold tracking-widest uppercase">
+          <span className="text-cyan-400 flex items-center bg-cyan-950/30 px-4 py-2 rounded-xl border border-cyan-900/50"><Target className="mr-2" size={16}/> {currentQuestion.topic}</span>
+          <span className="text-fuchsia-400 flex items-center bg-fuchsia-950/30 px-4 py-2 rounded-xl border border-fuchsia-900/50"><Activity className="mr-2" size={16}/> Level {currentQuestion.difficulty}</span>
+        </div>
+
+        <div className="w-full max-w-3xl relative">
           <AnimatePresence mode="wait">
-            <motion.div key={currentQuestion.id} initial={{ opacity: 0, x: 100 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -100 }} transition={{ duration: 0.3 }}
-              className="bg-slate-800 p-8 md:p-12 rounded-3xl border border-slate-700 shadow-2xl"
+            <motion.div key={currentQuestion.id} initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }} animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }} exit={{ opacity: 0, x: -100, filter: "blur(10px)" }} transition={{ duration: 0.4 }}
+              className="bg-slate-900/60 backdrop-blur-2xl p-8 md:p-12 rounded-[2.5rem] border border-slate-700/50 shadow-[0_0_50px_rgba(0,0,0,0.5)]"
             >
               <h2 className="text-2xl md:text-3xl font-semibold mb-10 text-white whitespace-pre-wrap">{formatAIText(currentQuestion.text)}</h2>
               <div className="space-y-4">
                 {Object.entries(currentQuestion.options).map(([key, value]) => (
                   <button key={key} onClick={() => setSelectedOption(key)}
-                    className={`w-full text-left p-5 rounded-2xl border-2 transition-all flex items-center group
-                      ${selectedOption === key ? 'border-indigo-500 bg-indigo-500/10' : 'border-slate-700 hover:border-indigo-400/50 bg-slate-800/50'}`}
+                    className={`w-full text-left p-6 rounded-2xl border-2 transition-all duration-300 flex items-center group
+                      ${selectedOption === key ? 'border-cyan-400 bg-cyan-950/40 shadow-[0_0_20px_rgba(6,182,212,0.15)] scale-[1.02]' : 'border-slate-800 bg-slate-900/50 hover:border-slate-600 hover:bg-slate-800'}`}
                   >
                     <span className={`flex-shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-xl mr-5 font-bold ${selectedOption === key ? 'bg-indigo-500 text-white' : 'bg-slate-700 text-slate-400'}`}>{key}</span>
                     <span className={`text-lg md:text-xl whitespace-pre-wrap ${selectedOption === key ? 'text-indigo-100' : 'text-slate-300'}`}>{formatAIText(value)}</span>
                   </button>
                 ))}
               </div>
-              <div className="mt-10 flex justify-end border-t border-slate-700 pt-6">
+              <div className="mt-12 flex justify-end">
                 <button onClick={handleNextQuestion} disabled={!selectedOption}
                   className={`px-10 py-4 rounded-xl font-bold text-lg transition-all ${selectedOption ? 'bg-indigo-500 hover:bg-indigo-400 text-white shadow-xl' : 'bg-slate-700 text-slate-500 opacity-50 cursor-not-allowed'}`}
                 >
@@ -265,14 +282,18 @@ export default function App() {
     const sessionAccuracy = Math.round((sessionScore / TOTAL_QUESTIONS) * 100);
     
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center py-12 px-6 font-sans text-white">
-        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-4xl">
+      <div className="min-h-screen bg-[#0B0F19] flex flex-col items-center py-16 px-6 font-sans text-white relative overflow-hidden">
+        {/* Glow Effects */}
+        <div className={`fixed top-0 w-[600px] h-[600px] rounded-full blur-[150px] opacity-20 pointer-events-none ${isSuccess ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+
+        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-4xl relative z-10">
           
-          {/* Header */}
-          <div className="text-center mb-10">
-            <Award size={64} className="text-amber-400 mx-auto mb-4" />
-            <h1 className="text-4xl font-extrabold mb-2 text-emerald-400">Test Summary</h1>
-            <p className="text-xl text-slate-400 font-medium">Session ID: #{(Math.random() * 10000).toFixed(0)}</p>
+          <div className="text-center mb-12">
+            <motion.div initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 200, damping: 20 }}>
+               <Award size={80} className={`mx-auto mb-6 drop-shadow-[0_0_20px_rgba(251,191,36,0.6)] ${isSuccess ? 'text-amber-400' : 'text-slate-600'}`} />
+            </motion.div>
+            <h1 className="text-5xl md:text-6xl font-black mb-4 tracking-tight">Mission Debrief</h1>
+            <p className="text-xl text-slate-400 font-medium">Session ID: <span className="text-cyan-400 font-mono">#{Math.random().toString(36).substr(2, 9).toUpperCase()}</span></p>
           </div>
 
           {/* Particular Session Result Card */}
@@ -300,13 +321,10 @@ export default function App() {
              </div>
           </div>
 
-          {/* Detailed Performance Review List */}
-          <div className="bg-slate-800 rounded-3xl p-6 md:p-8 border border-slate-700 shadow-2xl mb-8">
-            <h2 className="text-2xl font-bold mb-6 border-b border-slate-700 pb-4 flex items-center">
-              <Activity className="mr-3 text-indigo-400" /> Question-by-Question Analysis
-            </h2>
-            
-            <div className="space-y-6">
+          {/* STAGGERED Performance Review */}
+          <div className="mb-12">
+            <h2 className="text-3xl font-black mb-8 flex items-center text-white"><Brain className="mr-4 text-fuchsia-400" size={36}/> Test Analysis</h2>
+            <motion.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-6">
               {answerHistory.map((item, index) => (
                 <div key={index} className={`p-6 rounded-2xl border transition-all ${item.isCorrect ? 'bg-emerald-900/10 border-emerald-800/30' : 'bg-red-900/10 border-red-800/30'}`}>
                   
@@ -335,21 +353,22 @@ export default function App() {
                       </div>
                     )}
                   </div>
+
                   {!item.isCorrect && (
                     <div className="mt-4 bg-slate-900/60 p-4 rounded-xl border-l-4 border-indigo-500 italic text-slate-300 text-sm">
                       <span className="text-indigo-400 font-bold not-italic">Pro Tip: </span> {formatAIText(item.question.explanation)}
                     </div>
                   )}
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </div>
 
-          <div className="flex justify-center pb-10">
-            <button onClick={() => setCurrentView('dashboard')} className="px-12 py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-black text-lg transition-all shadow-xl shadow-indigo-500/20 hover:-translate-y-1">
-              Confirm & Return to Dashboard
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1 }} className="flex justify-center pb-20">
+            <button onClick={() => setCurrentView('dashboard')} className="px-12 py-5 bg-white text-[#0B0F19] rounded-2xl font-black text-xl transition-all shadow-[0_0_40px_rgba(255,255,255,0.2)] hover:shadow-[0_0_60px_rgba(255,255,255,0.4)] hover:-translate-y-2 flex items-center">
+              Return to HOME <ChevronRight className="ml-2"/>
             </button>
-          </div>
+          </motion.div>
         </motion.div>
       </div>
     );
