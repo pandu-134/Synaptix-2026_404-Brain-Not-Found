@@ -12,8 +12,6 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 
-# 1. Define the EXACT structure you want using a TypedDict
-# This guarantees the AI will return these exact keys with these exact data types.
 class QuestionSchema(typing.TypedDict):
     Question_Text: str
     Option_A: str
@@ -24,10 +22,8 @@ class QuestionSchema(typing.TypedDict):
     Topic: str
     Difficulty_Level: int
 
-# 2. Use System Instructions to set the persona 
 system_instruction = "You are an expert Computer Science Engineering professor creating an adaptive test."
 
-# Initialize model with the system instruction
 model = genai.GenerativeModel(
     'gemini-2.5-flash',
     system_instruction=system_instruction
@@ -49,17 +45,12 @@ CURRICULUM_GUIDELINES = {
 }
 
 def generate_dynamic_question(topic, difficulty_level):
-    """
-    Calls Gemini to generate a question, enforcing a strict JSON schema.
-    """
-    
     topic_context = ""
     if topic in CURRICULUM_GUIDELINES:
         level_1 = CURRICULUM_GUIDELINES[topic]["Level 1"]
         level_5 = CURRICULUM_GUIDELINES[topic]["Level 5"]
         topic_context = f"Context: Level 1 covers '{level_1}'. Level 5 covers '{level_5}'."
 
-    # Notice how much cleaner the prompt is now. No need to beg for JSON formatting!
     prompt = f"""
     Generate exactly ONE multiple-choice question about '{topic}' at a difficulty level of {difficulty_level} out of 5.
     {topic_context}
@@ -67,32 +58,21 @@ def generate_dynamic_question(topic, difficulty_level):
     """
 
     try:
-        # 3. Pass the schema into the generation config
         response = model.generate_content(
             prompt,
             generation_config=genai.GenerationConfig(
                 response_mime_type="application/json",
                 response_schema=QuestionSchema,
-                temperature=0.7, # 0.7 gives good variety without hallucinating facts
+                temperature=0.7, 
             )
         )
-        
-        # Because we used response_mime_type, response.text is guaranteed to be a valid JSON string
-        question_data = json.loads(response.text)
-        return question_data
+        return json.loads(response.text)
 
     except Exception as e:
         print(f"AI Generation Failed: {e}")
-        # FALLBACK mechanism stays exactly the same
         return {
             "Question_Text": "System overload fallback: What does HTML stand for?",
             "Option_A": "Hyper Text Markup Language", "Option_B": "High Tech Modern Language", 
             "Option_C": "Hyper Transfer Markup Link", "Option_D": "Home Tool Markup Language",
             "Correct_Option": "A", "Topic": topic, "Difficulty_Level": difficulty_level
         }
-
-# --- Quick Test ---
-if __name__ == "__main__":
-    print("Testing the AI Engine... Asking for Level 4 Web Dev...")
-    q = generate_dynamic_question("Web Development", 4)
-    print(json.dumps(q, indent=2))

@@ -2,27 +2,14 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Brain, TrendingUp, Target, Award, Play, Activity, CheckCircle2, XCircle, CheckCircle } from 'lucide-react';
 
-// --- EXPANDED DUMMY DATA WITH EXPLANATIONS ---
-const mockQuestions = [
-  { 
-    id: 101, topic: "Algorithms", difficulty: 3, 
-    text: "What is the worst-case time complexity of QuickSort?", 
-    options: { A: "O(n log n)", B: "O(n^2)", C: "O(n)", D: "O(log n)" }, correct: "B",
-    explanation: "While normally very fast, if the pivot chosen is always the largest or smallest element (like in an already sorted array), QuickSort degrades to O(n^2)."
-  },
-  { 
-    id: 102, topic: "Data Structures", difficulty: 4, 
-    text: "Which data structure uses the LIFO (Last In, First Out) principle?", 
-    options: { A: "Queue", B: "Linked List", C: "Stack", D: "Tree" }, correct: "C",
-    explanation: "A Stack operates like a stack of plates; the last plate you put on top is the first one you take off (LIFO)."
-  },
-  { 
-    id: 103, topic: "Python", difficulty: 2, 
-    text: "Which keyword is used to define a function in Python?", 
-    options: { A: "func", B: "def", C: "function", D: "define" }, correct: "B",
-    explanation: "In Python, the 'def' keyword is short for 'define' and is used to create user-defined functions."
-  }
-];
+// Helper to handle line breaks from AI text
+const formatAIText = (text) => {
+  if (!text) return "";
+  return text.replace(/\\n/g, '\n'); 
+};
+
+// Set how many questions you want the hackathon demo to be
+const TOTAL_QUESTIONS = 5;
 
 export default function App() {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -42,46 +29,96 @@ export default function App() {
   });
 
   // --- TEST TRACKING STATE ---
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [selectedOption, setSelectedOption] = useState(null);
   const [sessionScore, setSessionScore] = useState(0);
-  
-  // NEW: Track the history of their answers for the review screen!
+  const [questionsAnswered, setQuestionsAnswered] = useState(0);
   const [answerHistory, setAnswerHistory] = useState([]);
 
-  const startTest = () => {
-    setCurrentIndex(0);
-    setSelectedOption(null);
-    setSessionScore(0);
-    setAnswerHistory([]); // Reset history for new test
-    setCurrentView('test');
+  // --- API CONNECTION LOGIC ---
+  const formatBackendData = (backendQuestion) => {
+    // This maps the AI's uppercase JSON to Member 1's lowercase frontend format
+    return {
+      id: Math.random(), // Unique key for animations
+      topic: backendQuestion.Topic,
+      difficulty: backendQuestion.Difficulty_Level,
+      text: backendQuestion.Question_Text,
+      options: {
+        A: backendQuestion.Option_A,
+        B: backendQuestion.Option_B,
+        C: backendQuestion.Option_C,
+        D: backendQuestion.Option_D
+      },
+      correct: backendQuestion.Correct_Option,
+      explanation: backendQuestion.Explanation || "No explanation provided by AI."
+    };
   };
 
-  const handleNextQuestion = () => {
-    const currentQuestion = mockQuestions[currentIndex];
+  const startTest = async () => {
+    setIsLoading(true);
+    setCurrentView('test');
+    setSessionScore(0);
+    setQuestionsAnswered(0);
+    setAnswerHistory([]); 
+    setSelectedOption(null);
+
+    try {
+      const response = await fetch('http://127.0.0.1:5001/api/start-test');
+      const data = await response.json();
+      setCurrentQuestion(formatBackendData(data.question));
+    } catch (error) {
+      console.error("Failed to connect to backend:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleNextQuestion = async () => {
     const isCorrect = selectedOption === currentQuestion.correct;
+    const updatedScore = sessionScore + (isCorrect ? 1 : 0);
     
-    // Save this specific answer to our history log
+    // Save this answer to history BEFORE fetching the next one
     setAnswerHistory(prev => [...prev, {
       question: currentQuestion,
       selectedOption: selectedOption,
       isCorrect: isCorrect
     }]);
 
-    const updatedScore = sessionScore + (isCorrect ? 1 : 0);
     setSessionScore(updatedScore);
 
-    if (currentIndex < mockQuestions.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-      setSelectedOption(null);
-    } else {
+    // Stop Condition
+    if (questionsAnswered >= TOTAL_QUESTIONS - 1) {
       calculateNewStats(updatedScore);
       setCurrentView('results');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch('http://127.0.0.1:5001/api/submit-answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic: currentQuestion.topic,
+          current_difficulty: currentQuestion.difficulty,
+          is_correct: isCorrect
+        })
+      });
+      
+      const data = await response.json();
+      setCurrentQuestion(formatBackendData(data.question));
+      setQuestionsAnswered(prev => prev + 1);
+      setSelectedOption(null);
+    } catch (error) {
+      console.error("Error submitting answer:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const calculateNewStats = (finalScore) => {
-    const testAccuracy = (finalScore / mockQuestions.length) * 100;
+    const testAccuracy = (finalScore / TOTAL_QUESTIONS) * 100;
 
     setStudentData(prevData => {
       const newAvgAccuracy = prevData.totalTests === 0 
@@ -90,7 +127,7 @@ export default function App() {
 
       const updatedSkills = prevData.skills.map(skill => {
         if (["Algorithms", "Data Structures", "Python"].includes(skill.name)) {
-           let masteryChange = (finalScore / mockQuestions.length) >= 0.5 ? 15 : -5; 
+           let masteryChange = (finalScore / TOTAL_QUESTIONS) >= 0.5 ? 15 : -5; 
            let newMastery = Math.min(100, Math.max(0, skill.mastery + masteryChange));
            return { ...skill, mastery: newMastery };
         }
@@ -177,7 +214,16 @@ export default function App() {
 
   // --- ACTIVE TEST VIEW ---
   if (currentView === 'test') {
-    const currentQuestion = mockQuestions[currentIndex];
+    if (isLoading || !currentQuestion) {
+      return (
+        <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white p-6 text-center">
+          <Activity className="animate-spin text-indigo-500 mb-6 mx-auto" size={64} />
+          <h2 className="text-3xl font-bold mb-2">Generating Adaptive Question...</h2>
+          <p className="text-slate-400 text-lg">Our AI is analyzing your skill level</p>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 font-sans">
         <div className="w-full max-w-3xl flex justify-between mb-8 text-sm font-bold tracking-wide">
@@ -189,7 +235,7 @@ export default function App() {
             <motion.div key={currentQuestion.id} initial={{ opacity: 0, x: 100 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -100 }} transition={{ duration: 0.3 }}
               className="bg-slate-800 p-8 md:p-12 rounded-3xl border border-slate-700 shadow-2xl"
             >
-              <h2 className="text-2xl md:text-3xl font-semibold mb-10 text-white">{currentQuestion.text}</h2>
+              <h2 className="text-2xl md:text-3xl font-semibold mb-10 text-white whitespace-pre-wrap">{formatAIText(currentQuestion.text)}</h2>
               <div className="space-y-4">
                 {Object.entries(currentQuestion.options).map(([key, value]) => (
                   <button key={key} onClick={() => setSelectedOption(key)}
@@ -197,7 +243,7 @@ export default function App() {
                       ${selectedOption === key ? 'border-indigo-500 bg-indigo-500/10' : 'border-slate-700 hover:border-indigo-400/50 bg-slate-800/50'}`}
                   >
                     <span className={`flex-shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-xl mr-5 font-bold ${selectedOption === key ? 'bg-indigo-500 text-white' : 'bg-slate-700 text-slate-400'}`}>{key}</span>
-                    <span className={`text-lg md:text-xl ${selectedOption === key ? 'text-indigo-100' : 'text-slate-300'}`}>{value}</span>
+                    <span className={`text-lg md:text-xl whitespace-pre-wrap ${selectedOption === key ? 'text-indigo-100' : 'text-slate-300'}`}>{formatAIText(value)}</span>
                   </button>
                 ))}
               </div>
@@ -205,7 +251,7 @@ export default function App() {
                 <button onClick={handleNextQuestion} disabled={!selectedOption}
                   className={`px-10 py-4 rounded-xl font-bold text-lg transition-all ${selectedOption ? 'bg-indigo-500 hover:bg-indigo-400 text-white' : 'bg-slate-700 text-slate-500 opacity-50 cursor-not-allowed'}`}
                 >
-                  {currentIndex === mockQuestions.length - 1 ? 'Finish Test' : 'Submit & Next'}
+                  {questionsAnswered === TOTAL_QUESTIONS - 1 ? 'Finish Test' : 'Submit & Next'}
                 </button>
               </div>
             </motion.div>
@@ -221,14 +267,12 @@ export default function App() {
       <div className="min-h-screen bg-slate-900 flex flex-col items-center py-12 px-6 font-sans text-white">
         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-4xl">
           
-          {/* Header */}
           <div className="text-center mb-10">
             <Award size={64} className="text-amber-400 mx-auto mb-4" />
             <h1 className="text-4xl font-extrabold mb-2 text-emerald-400">Assessment Complete!</h1>
-            <p className="text-xl text-slate-300">You scored {sessionScore} out of {mockQuestions.length}.</p>
+            <p className="text-xl text-slate-300">You scored {sessionScore} out of {TOTAL_QUESTIONS}.</p>
           </div>
 
-          {/* Performance Review List */}
           <div className="bg-slate-800 rounded-3xl p-6 md:p-8 border border-slate-700 shadow-2xl mb-8">
             <h2 className="text-2xl font-bold mb-6 border-b border-slate-700 pb-4">Performance Review</h2>
             
@@ -236,9 +280,8 @@ export default function App() {
               {answerHistory.map((item, index) => (
                 <div key={index} className={`p-6 rounded-2xl border ${item.isCorrect ? 'bg-emerald-900/20 border-emerald-800/50' : 'bg-red-900/20 border-red-800/50'}`}>
                   
-                  {/* Question Title & Status */}
                   <div className="flex items-start justify-between mb-4">
-                    <h3 className="text-lg font-semibold pr-4">{index + 1}. {item.question.text}</h3>
+                    <h3 className="text-lg font-semibold pr-4 whitespace-pre-wrap">{index + 1}. {formatAIText(item.question.text)}</h3>
                     {item.isCorrect ? (
                       <CheckCircle className="text-emerald-500 flex-shrink-0" size={28} />
                     ) : (
@@ -246,29 +289,30 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* Options Selected vs Correct */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm md:text-base">
                     <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
                       <span className="text-slate-400 block mb-1 text-xs uppercase font-bold">Your Answer</span>
-                      <span className={item.isCorrect ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
-                        {item.selectedOption}: {item.question.options[item.selectedOption]}
+                      <span className={item.isCorrect ? "text-emerald-400 font-medium whitespace-pre-wrap" : "text-red-400 font-medium whitespace-pre-wrap"}>
+                        {item.selectedOption}: {formatAIText(item.question.options[item.selectedOption])}
                       </span>
                     </div>
                     
                     {!item.isCorrect && (
                       <div className="bg-emerald-900/20 p-3 rounded-xl border border-emerald-800/50">
                         <span className="text-emerald-500 block mb-1 text-xs uppercase font-bold">Correct Answer</span>
-                        <span className="text-emerald-400 font-medium">
-                          {item.question.correct}: {item.question.options[item.question.correct]}
+                        <span className="text-emerald-400 font-medium whitespace-pre-wrap">
+                          {item.question.correct}: {formatAIText(item.question.options[item.question.correct])}
                         </span>
                       </div>
                     )}
                   </div>
 
-                  {/* Explanation (Only show if they got it wrong) */}
+                  {/* The AI Explanation shows up right here! */}
                   {!item.isCorrect && item.question.explanation && (
                     <div className="mt-4 bg-slate-900/50 p-4 rounded-xl border-l-4 border-indigo-500">
-                      <p className="text-sm text-slate-300"><strong className="text-indigo-400">Explanation:</strong> {item.question.explanation}</p>
+                      <p className="text-sm text-slate-300 whitespace-pre-wrap"><strong className="text-indigo-400">Explanation: </strong> 
+                        {formatAIText(item.question.explanation)}
+                      </p>
                     </div>
                   )}
 
@@ -277,7 +321,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Action Button */}
           <div className="flex justify-center">
             <button onClick={() => setCurrentView('dashboard')} className="px-10 py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-lg transition-all shadow-lg shadow-indigo-500/30">
               Return to Dashboard
