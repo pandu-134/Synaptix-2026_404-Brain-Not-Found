@@ -25,37 +25,109 @@ export default function App() {
     ]
   });
 
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // --- TEST TRACKING STATE ---
+  const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [selectedOption, setSelectedOption] = useState(null);
   const [sessionScore, setSessionScore] = useState(0);
+  const [questionsAnswered, setQuestionsAnswered] = useState(0);
   const [answerHistory, setAnswerHistory] = useState([]);
 
-  const startTest = () => {
-    setCurrentIndex(0); setSelectedOption(null); setSessionScore(0); setAnswerHistory([]); setCurrentView('test');
+  // --- API CONNECTION LOGIC ---
+  const formatBackendData = (backendQuestion) => {
+    return {
+      id: Math.random(), 
+      topic: backendQuestion.Topic,
+      difficulty: backendQuestion.Difficulty_Level,
+      text: backendQuestion.Question_Text,
+      options: {
+        A: backendQuestion.Option_A,
+        B: backendQuestion.Option_B,
+        C: backendQuestion.Option_C,
+        D: backendQuestion.Option_D
+      },
+      correct: backendQuestion.Correct_Option,
+      explanation: backendQuestion.Explanation || "Keep practicing to master this concept!"
+    };
   };
 
-  const handleNextQuestion = () => {
-    const currentQuestion = mockQuestions[currentIndex];
+  const startTest = async () => {
+    setIsLoading(true);
+    setCurrentView('test');
+    setSelectedOption(null);
+    setSessionScore(0);
+    setQuestionsAnswered(0);
+    setAnswerHistory([]); 
+
+    try {
+      const response = await fetch('http://127.0.0.1:5001/api/start-test');
+      const data = await response.json();
+      setCurrentQuestion(formatBackendData(data.question));
+    } catch (error) {
+      console.error("Failed to connect to backend:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleNextQuestion = async () => {
     const isCorrect = selectedOption === currentQuestion.correct;
-    
-    setAnswerHistory(prev => [...prev, { question: currentQuestion, selectedOption, isCorrect }]);
     const updatedScore = sessionScore + (isCorrect ? 1 : 0);
+    
+    // Save this specific answer to our history log
+    setAnswerHistory(prev => [...prev, {
+      question: currentQuestion,
+      selectedOption: selectedOption,
+      isCorrect: isCorrect
+    }]);
+
     setSessionScore(updatedScore);
 
-    if (currentIndex < mockQuestions.length - 1) {
-      setCurrentIndex(currentIndex + 1); setSelectedOption(null);
-    } else {
-      calculateNewStats(updatedScore); setCurrentView('results');
+    // Stop Condition
+    if (questionsAnswered >= TOTAL_QUESTIONS - 1) {
+      calculateNewStats(updatedScore);
+      setCurrentView('results');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch('http://127.0.0.1:5001/api/submit-answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic: currentQuestion.topic,
+          current_difficulty: currentQuestion.difficulty,
+          is_correct: isCorrect
+        })
+      });
+      
+      const data = await response.json();
+      setCurrentQuestion(formatBackendData(data.question));
+      setQuestionsAnswered(prev => prev + 1);
+      setSelectedOption(null);
+    } catch (error) {
+      console.error("Error submitting answer:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const calculateNewStats = (finalScore) => {
-    const testAccuracy = (finalScore / mockQuestions.length) * 100;
-    setStudentData(prev => {
-      const newAvgAccuracy = prev.totalTests === 0 ? Math.round(testAccuracy) : Math.round(((prev.avgAccuracy * prev.totalTests) + testAccuracy) / (prev.totalTests + 1));
-      const updatedSkills = prev.skills.map(skill => {
-        let masteryChange = (finalScore / mockQuestions.length) >= 0.5 ? 25 : -10; 
-        return { ...skill, mastery: Math.min(100, Math.max(0, skill.mastery + masteryChange)) };
+    const testAccuracy = (finalScore / TOTAL_QUESTIONS) * 100;
+
+    setStudentData(prevData => {
+      const newAvgAccuracy = prevData.totalTests === 0 
+        ? Math.round(testAccuracy) 
+        : Math.round(((prevData.avgAccuracy * prevData.totalTests) + testAccuracy) / (prevData.totalTests + 1));
+
+      const updatedSkills = prevData.skills.map(skill => {
+        if (["Algorithms", "Data Structures", "Python"].includes(skill.name)) {
+           let masteryChange = (finalScore / TOTAL_QUESTIONS) >= 0.5 ? 15 : -5; 
+           let newMastery = Math.min(100, Math.max(0, skill.mastery + masteryChange));
+           return { ...skill, mastery: newMastery };
+        }
+        return skill;
       });
       return { ...prev, totalTests: prev.totalTests + 1, avgAccuracy: newAvgAccuracy, skills: updatedSkills };
     });
@@ -167,8 +239,15 @@ export default function App() {
   // ... (The rest of the code remains exactly the same for Active Test and Results views) ...
   // --- ACTIVE TEST VIEW ---
   if (currentView === 'test') {
-    const currentQuestion = mockQuestions[currentIndex];
-    const progress = ((currentIndex + 1) / mockQuestions.length) * 100;
+    if (isLoading || !currentQuestion) {
+      return (
+        <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white p-6 text-center">
+          <Activity className="animate-spin text-indigo-500 mb-6 mx-auto" size={64} />
+          <h2 className="text-3xl font-bold mb-2">Generating Adaptive Question...</h2>
+          <p className="text-slate-400 text-lg">Our AI is analyzing your skill level</p>
+        </div>
+      );
+    }
 
     return (
       <div className="min-h-screen bg-[#0B0F19] flex flex-col items-center justify-center p-6 font-sans selection:bg-cyan-500/30">
@@ -186,23 +265,23 @@ export default function App() {
             <motion.div key={currentQuestion.id} initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }} animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }} exit={{ opacity: 0, x: -100, filter: "blur(10px)" }} transition={{ duration: 0.4 }}
               className="bg-slate-900/60 backdrop-blur-2xl p-8 md:p-12 rounded-[2.5rem] border border-slate-700/50 shadow-[0_0_50px_rgba(0,0,0,0.5)]"
             >
-              <h2 className="text-2xl md:text-4xl font-semibold mb-10 text-white leading-tight tracking-tight">{currentQuestion.text}</h2>
+              <h2 className="text-2xl md:text-3xl font-semibold mb-10 text-white whitespace-pre-wrap">{formatAIText(currentQuestion.text)}</h2>
               <div className="space-y-4">
                 {Object.entries(currentQuestion.options).map(([key, value]) => (
                   <button key={key} onClick={() => setSelectedOption(key)}
                     className={`w-full text-left p-6 rounded-2xl border-2 transition-all duration-300 flex items-center group
                       ${selectedOption === key ? 'border-cyan-400 bg-cyan-950/40 shadow-[0_0_20px_rgba(6,182,212,0.15)] scale-[1.02]' : 'border-slate-800 bg-slate-900/50 hover:border-slate-600 hover:bg-slate-800'}`}
                   >
-                    <span className={`flex-shrink-0 inline-flex items-center justify-center w-12 h-12 rounded-xl mr-6 font-black text-xl transition-all duration-300 ${selectedOption === key ? 'bg-cyan-400 text-[#0B0F19] shadow-[0_0_15px_rgba(6,182,212,0.5)]' : 'bg-slate-800 text-slate-500 group-hover:bg-slate-700 group-hover:text-slate-300'}`}>{key}</span>
-                    <span className={`text-xl font-medium tracking-wide ${selectedOption === key ? 'text-cyan-50' : 'text-slate-300'}`}>{value}</span>
+                    <span className={`flex-shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-xl mr-5 font-bold ${selectedOption === key ? 'bg-indigo-500 text-white' : 'bg-slate-700 text-slate-400'}`}>{key}</span>
+                    <span className={`text-lg md:text-xl whitespace-pre-wrap ${selectedOption === key ? 'text-indigo-100' : 'text-slate-300'}`}>{formatAIText(value)}</span>
                   </button>
                 ))}
               </div>
               <div className="mt-12 flex justify-end">
                 <button onClick={handleNextQuestion} disabled={!selectedOption}
-                  className={`px-10 py-5 rounded-2xl font-black text-lg transition-all duration-300 flex items-center ${selectedOption ? 'bg-white text-[#0B0F19] shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-105' : 'bg-slate-800 text-slate-600 opacity-50 cursor-not-allowed'}`}
+                  className={`px-10 py-4 rounded-xl font-bold text-lg transition-all ${selectedOption ? 'bg-indigo-500 hover:bg-indigo-400 text-white shadow-xl' : 'bg-slate-700 text-slate-500 opacity-50 cursor-not-allowed'}`}
                 >
-                  {currentIndex === mockQuestions.length - 1 ? 'Execute Evaluation' : 'Lock Answer & Proceed'} <ChevronRight className="ml-2"/>
+                  {questionsAnswered === TOTAL_QUESTIONS - 1 ? 'Finish Test' : 'Submit & Next'}
                 </button>
               </div>
             </motion.div>
@@ -212,10 +291,9 @@ export default function App() {
     );
   }
 
-  // --- SHOWCASE RESULTS VIEW ---
+  // --- RESULTS & EXPLANATION VIEW ---
   if (currentView === 'results') {
-    const sessionAccuracy = Math.round((sessionScore / mockQuestions.length) * 100);
-    const isSuccess = sessionAccuracy >= 50;
+    const sessionAccuracy = Math.round((sessionScore / TOTAL_QUESTIONS) * 100);
     
     return (
       <div className="min-h-screen bg-[#0B0F19] flex flex-col items-center py-16 px-6 font-sans text-white relative overflow-hidden">
@@ -238,23 +316,18 @@ export default function App() {
                   <h2 className="text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400">{sessionAccuracy}%</h2>
                   <p className="mt-4 text-slate-300 font-bold text-lg bg-slate-800/50 px-6 py-2 rounded-full">{sessionScore} / {mockQuestions.length} Data Points Verified</p>
                 </div>
-             </motion.div>
-
-             <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="bg-slate-900/50 backdrop-blur-xl p-10 rounded-[2.5rem] border border-slate-700/50 shadow-xl space-y-6 flex flex-col justify-center">
-                <h3 className="text-xl font-bold text-slate-200 border-b border-slate-700 pb-4">Session Telemetry</h3>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center"><span className="text-slate-400 font-medium">Cognitive Efficiency</span><span className={`font-black ${isSuccess ? 'text-emerald-400' : 'text-amber-400'}`}>{isSuccess ? 'Optimal' : 'Recalibrating'}</span></div>
-                  <div className="flex justify-between items-center"><span className="text-slate-400 font-medium">Adaptive Engine</span><span className="text-fuchsia-400 font-black">Active (Lvl 3.5)</span></div>
-                  <div className="flex justify-between items-center"><span className="text-slate-400 font-medium">Time Dilation</span><span className="text-white font-black font-mono">02:45:12</span></div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Test Format</span>
+                  <span className="text-slate-200 font-bold">{TOTAL_QUESTIONS} Questions</span>
                 </div>
-             </motion.div>
+             </div>
           </div>
 
           <div className="mb-12">
             <h2 className="text-3xl font-black mb-8 flex items-center text-white"><Brain className="mr-4 text-fuchsia-400" size={36}/> Test Analysis</h2>
             <motion.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-6">
               {answerHistory.map((item, index) => (
-                <motion.div variants={slideUpItem} key={index} className={`p-8 rounded-[2rem] border relative overflow-hidden backdrop-blur-md transition-all hover:scale-[1.01] ${item.isCorrect ? 'bg-emerald-950/20 border-emerald-900/50 shadow-[0_0_30px_rgba(16,185,129,0.05)]' : 'bg-red-950/20 border-red-900/50 shadow-[0_0_30px_rgba(244,63,94,0.05)]'}`}>
+                <div key={index} className={`p-6 rounded-2xl border transition-all ${item.isCorrect ? 'bg-emerald-900/10 border-emerald-800/30' : 'bg-red-900/10 border-red-800/30'}`}>
                   
                   <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${item.isCorrect ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]' : 'bg-red-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]'}`}></div>
 
@@ -263,23 +336,26 @@ export default function App() {
                     {item.isCorrect ? <CheckCircle className="text-emerald-400 flex-shrink-0 drop-shadow-[0_0_8px_rgba(16,185,129,0.8)]" size={32} /> : <XCircle className="text-red-400 flex-shrink-0 drop-shadow-[0_0_8px_rgba(244,63,94,0.8)]" size={32} />}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4">
-                    <div className="bg-[#0B0F19]/60 p-5 rounded-2xl border border-slate-800">
-                      <span className="text-slate-500 block mb-2 text-xs uppercase font-black tracking-widest">User Input</span>
-                      <span className={`text-lg font-bold ${item.isCorrect ? "text-emerald-400" : "text-red-400"}`}>{item.selectedOption}: {item.question.options[item.selectedOption]}</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="bg-slate-900/40 p-3 rounded-xl border border-slate-700/50">
+                      <span className="text-slate-500 block mb-1 text-[10px] uppercase font-black">Your Choice</span>
+                      <span className={item.isCorrect ? "text-emerald-400 font-bold whitespace-pre-wrap" : "text-red-400 font-bold whitespace-pre-wrap"}>
+                        {item.selectedOption}: {formatAIText(item.question.options[item.selectedOption])}
+                      </span>
                     </div>
                     {!item.isCorrect && (
-                      <div className="bg-emerald-950/30 p-5 rounded-2xl border border-emerald-900/50">
-                        <span className="text-emerald-500 block mb-2 text-xs uppercase font-black tracking-widest">Optimal Output</span>
-                        <span className="text-emerald-400 text-lg font-bold">{item.question.correct}: {item.question.options[item.question.correct]}</span>
+                      <div className="bg-emerald-900/20 p-3 rounded-xl border border-emerald-800/30">
+                        <span className="text-emerald-500 block mb-1 text-[10px] uppercase font-black">Correct Answer</span>
+                        <span className="text-emerald-400 font-bold whitespace-pre-wrap">
+                          {item.question.correct}: {formatAIText(item.question.options[item.question.correct])}
+                        </span>
                       </div>
                     )}
                   </div>
 
                   {!item.isCorrect && (
-                    <div className="mt-6 ml-4 bg-[#0B0F19]/80 p-5 rounded-2xl border-l-4 border-fuchsia-500 flex items-start">
-                      <Sparkles className="text-fuchsia-400 mr-4 flex-shrink-0 mt-1" size={20}/>
-                      <p className="text-slate-300 font-medium leading-relaxed"><strong className="text-fuchsia-400 font-bold uppercase text-xs tracking-widest block mb-1">AI Insights</strong> {item.question.explanation}</p>
+                    <div className="mt-4 bg-slate-900/60 p-4 rounded-xl border-l-4 border-indigo-500 italic text-slate-300 text-sm">
+                      <span className="text-indigo-400 font-bold not-italic">Pro Tip: </span> {formatAIText(item.question.explanation)}
                     </div>
                   )}
                 </motion.div>
