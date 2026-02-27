@@ -8,7 +8,7 @@ const formatAIText = (text) => {
   return text.replace(/\\n/g, '\n'); 
 };
 
-// Set how many questions you want the hackathon demo to be
+// Set how many questions the assessment should have
 const TOTAL_QUESTIONS = 5;
 
 export default function App() {
@@ -38,9 +38,8 @@ export default function App() {
 
   // --- API CONNECTION LOGIC ---
   const formatBackendData = (backendQuestion) => {
-    // This maps the AI's uppercase JSON to Member 1's lowercase frontend format
     return {
-      id: Math.random(), // Unique key for animations
+      id: Math.random(), 
       topic: backendQuestion.Topic,
       difficulty: backendQuestion.Difficulty_Level,
       text: backendQuestion.Question_Text,
@@ -51,17 +50,17 @@ export default function App() {
         D: backendQuestion.Option_D
       },
       correct: backendQuestion.Correct_Option,
-      explanation: backendQuestion.Explanation || "No explanation provided by AI."
+      explanation: backendQuestion.Explanation || "Keep practicing to master this concept!"
     };
   };
 
   const startTest = async () => {
     setIsLoading(true);
     setCurrentView('test');
+    setSelectedOption(null);
     setSessionScore(0);
     setQuestionsAnswered(0);
     setAnswerHistory([]); 
-    setSelectedOption(null);
 
     try {
       const response = await fetch('http://127.0.0.1:5001/api/start-test');
@@ -78,7 +77,7 @@ export default function App() {
     const isCorrect = selectedOption === currentQuestion.correct;
     const updatedScore = sessionScore + (isCorrect ? 1 : 0);
     
-    // Save this answer to history BEFORE fetching the next one
+    // Save this specific answer to our history log
     setAnswerHistory(prev => [...prev, {
       question: currentQuestion,
       selectedOption: selectedOption,
@@ -249,7 +248,7 @@ export default function App() {
               </div>
               <div className="mt-10 flex justify-end border-t border-slate-700 pt-6">
                 <button onClick={handleNextQuestion} disabled={!selectedOption}
-                  className={`px-10 py-4 rounded-xl font-bold text-lg transition-all ${selectedOption ? 'bg-indigo-500 hover:bg-indigo-400 text-white' : 'bg-slate-700 text-slate-500 opacity-50 cursor-not-allowed'}`}
+                  className={`px-10 py-4 rounded-xl font-bold text-lg transition-all ${selectedOption ? 'bg-indigo-500 hover:bg-indigo-400 text-white shadow-xl' : 'bg-slate-700 text-slate-500 opacity-50 cursor-not-allowed'}`}
                 >
                   {questionsAnswered === TOTAL_QUESTIONS - 1 ? 'Finish Test' : 'Submit & Next'}
                 </button>
@@ -263,25 +262,56 @@ export default function App() {
 
   // --- RESULTS & EXPLANATION VIEW ---
   if (currentView === 'results') {
+    const sessionAccuracy = Math.round((sessionScore / TOTAL_QUESTIONS) * 100);
+    
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center py-12 px-6 font-sans text-white">
         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-4xl">
           
+          {/* Header */}
           <div className="text-center mb-10">
             <Award size={64} className="text-amber-400 mx-auto mb-4" />
-            <h1 className="text-4xl font-extrabold mb-2 text-emerald-400">Assessment Complete!</h1>
-            <p className="text-xl text-slate-300">You scored {sessionScore} out of {TOTAL_QUESTIONS}.</p>
+            <h1 className="text-4xl font-extrabold mb-2 text-emerald-400">Test Summary</h1>
+            <p className="text-xl text-slate-400 font-medium">Session ID: #{(Math.random() * 10000).toFixed(0)}</p>
           </div>
 
+          {/* Particular Session Result Card */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+             <div className="bg-indigo-600 p-8 rounded-3xl shadow-lg flex flex-col items-center justify-center">
+                <span className="text-indigo-200 uppercase text-xs font-bold tracking-widest mb-2">Session Score</span>
+                <h2 className="text-6xl font-black text-white">{sessionAccuracy}%</h2>
+                <p className="mt-2 text-indigo-100 font-medium">{sessionScore} / {TOTAL_QUESTIONS} Correct</p>
+             </div>
+
+             <div className="bg-slate-800 p-8 rounded-3xl border border-slate-700 shadow-lg space-y-4">
+                <h3 className="text-lg font-bold text-slate-200 border-b border-slate-700 pb-2">Session Insights</h3>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Efficiency</span>
+                  <span className="text-emerald-400 font-bold">{sessionAccuracy > 70 ? 'High' : 'Improving'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Difficulty Level</span>
+                  <span className="text-indigo-300 font-bold">Adaptive (AI Generated)</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Test Format</span>
+                  <span className="text-slate-200 font-bold">{TOTAL_QUESTIONS} Questions</span>
+                </div>
+             </div>
+          </div>
+
+          {/* Detailed Performance Review List */}
           <div className="bg-slate-800 rounded-3xl p-6 md:p-8 border border-slate-700 shadow-2xl mb-8">
-            <h2 className="text-2xl font-bold mb-6 border-b border-slate-700 pb-4">Performance Review</h2>
+            <h2 className="text-2xl font-bold mb-6 border-b border-slate-700 pb-4 flex items-center">
+              <Activity className="mr-3 text-indigo-400" /> Question-by-Question Analysis
+            </h2>
             
             <div className="space-y-6">
               {answerHistory.map((item, index) => (
-                <div key={index} className={`p-6 rounded-2xl border ${item.isCorrect ? 'bg-emerald-900/20 border-emerald-800/50' : 'bg-red-900/20 border-red-800/50'}`}>
+                <div key={index} className={`p-6 rounded-2xl border transition-all ${item.isCorrect ? 'bg-emerald-900/10 border-emerald-800/30' : 'bg-red-900/10 border-red-800/30'}`}>
                   
                   <div className="flex items-start justify-between mb-4">
-                    <h3 className="text-lg font-semibold pr-4 whitespace-pre-wrap">{index + 1}. {formatAIText(item.question.text)}</h3>
+                    <h3 className="text-lg font-semibold pr-4 leading-snug whitespace-pre-wrap">{index + 1}. {formatAIText(item.question.text)}</h3>
                     {item.isCorrect ? (
                       <CheckCircle className="text-emerald-500 flex-shrink-0" size={28} />
                     ) : (
@@ -289,44 +319,37 @@ export default function App() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm md:text-base">
-                    <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
-                      <span className="text-slate-400 block mb-1 text-xs uppercase font-bold">Your Answer</span>
-                      <span className={item.isCorrect ? "text-emerald-400 font-medium whitespace-pre-wrap" : "text-red-400 font-medium whitespace-pre-wrap"}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="bg-slate-900/40 p-3 rounded-xl border border-slate-700/50">
+                      <span className="text-slate-500 block mb-1 text-[10px] uppercase font-black">Your Choice</span>
+                      <span className={item.isCorrect ? "text-emerald-400 font-bold whitespace-pre-wrap" : "text-red-400 font-bold whitespace-pre-wrap"}>
                         {item.selectedOption}: {formatAIText(item.question.options[item.selectedOption])}
                       </span>
                     </div>
-                    
                     {!item.isCorrect && (
-                      <div className="bg-emerald-900/20 p-3 rounded-xl border border-emerald-800/50">
-                        <span className="text-emerald-500 block mb-1 text-xs uppercase font-bold">Correct Answer</span>
-                        <span className="text-emerald-400 font-medium whitespace-pre-wrap">
+                      <div className="bg-emerald-900/20 p-3 rounded-xl border border-emerald-800/30">
+                        <span className="text-emerald-500 block mb-1 text-[10px] uppercase font-black">Correct Answer</span>
+                        <span className="text-emerald-400 font-bold whitespace-pre-wrap">
                           {item.question.correct}: {formatAIText(item.question.options[item.question.correct])}
                         </span>
                       </div>
                     )}
                   </div>
-
-                  {/* The AI Explanation shows up right here! */}
-                  {!item.isCorrect && item.question.explanation && (
-                    <div className="mt-4 bg-slate-900/50 p-4 rounded-xl border-l-4 border-indigo-500">
-                      <p className="text-sm text-slate-300 whitespace-pre-wrap"><strong className="text-indigo-400">Explanation: </strong> 
-                        {formatAIText(item.question.explanation)}
-                      </p>
+                  {!item.isCorrect && (
+                    <div className="mt-4 bg-slate-900/60 p-4 rounded-xl border-l-4 border-indigo-500 italic text-slate-300 text-sm">
+                      <span className="text-indigo-400 font-bold not-italic">Pro Tip: </span> {formatAIText(item.question.explanation)}
                     </div>
                   )}
-
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="flex justify-center">
-            <button onClick={() => setCurrentView('dashboard')} className="px-10 py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-lg transition-all shadow-lg shadow-indigo-500/30">
-              Return to Dashboard
+          <div className="flex justify-center pb-10">
+            <button onClick={() => setCurrentView('dashboard')} className="px-12 py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-black text-lg transition-all shadow-xl shadow-indigo-500/20 hover:-translate-y-1">
+              Confirm & Return to Dashboard
             </button>
           </div>
-
         </motion.div>
       </div>
     );
