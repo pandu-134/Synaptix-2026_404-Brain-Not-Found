@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, TrendingUp, Target, Award, Play, Activity, CheckCircle2, XCircle, CheckCircle, Flame, Sparkles, ChevronRight } from 'lucide-react';
+import { Brain, TrendingUp, Target, Award, Play, Activity, CheckCircle2, XCircle, CheckCircle, Flame, Sparkles, ChevronRight, Zap, AlertTriangle } from 'lucide-react';
 
 // --- EXPANDED DUMMY DATA ---
 const mockQuestions = [
@@ -9,16 +9,9 @@ const mockQuestions = [
   { id: 103, topic: "Python", difficulty: 2, text: "Which keyword is used to define a function in Python?", options: { A: "func", B: "def", C: "function", D: "define" }, correct: "B", explanation: "In Python, 'def' is short for 'define' and creates user-defined functions." }
 ];
 
-// --- FRAMER MOTION VARIANTS (For Showcase Animations) ---
-const staggerContainer = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.15 } }
-};
-
-const slideUpItem = {
-  hidden: { opacity: 0, y: 30 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-};
+// --- FRAMER MOTION VARIANTS ---
+const staggerContainer = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.15 } } };
+const slideUpItem = { hidden: { opacity: 0, y: 30 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } } };
 
 export default function App() {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -70,10 +63,14 @@ export default function App() {
 
   // --- DASHBOARD VIEW ---
   if (currentView === 'dashboard') {
+    // DYNAMICALLY CALCULATE STRENGTHS AND WEAKNESSES
+    // We make a copy of the skills array and sort it from highest mastery to lowest
+    const sortedSkills = [...studentData.skills].sort((a, b) => b.mastery - a.mastery);
+    const topSkill = sortedSkills[0]; // The highest score
+    const bottomSkill = sortedSkills[sortedSkills.length - 1]; // The lowest score
+
     return (
-      <div className="min-h-screen bg-[#0B0F19] text-slate-100 p-6 md:p-12 font-sans overflow-x-hidden selection:bg-fuchsia-500/30">
-        
-        {/* Background Ambient Glow */}
+      <div className="min-h-screen bg-[#0B0F19] text-slate-100 p-6 md:p-12 font-sans overflow-x-hidden selection:bg-fuchsia-500/30 pb-20">
         <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-fuchsia-600/20 blur-[120px] rounded-full pointer-events-none"></div>
 
         <div className="max-w-6xl mx-auto space-y-10 relative z-10">
@@ -90,16 +87,13 @@ export default function App() {
             </div>
           </motion.div>
 
-          {/* Dynamic Stats Grid (Staggered) */}
           <motion.div variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               { title: "Missions Completed", value: studentData.totalTests, icon: <CheckCircle2 className="text-cyan-400" size={28}/>, glow: "shadow-cyan-500/10" },
               { title: "Global Accuracy", value: `${studentData.avgAccuracy}%`, icon: <Target className="text-fuchsia-400" size={28}/>, glow: "shadow-fuchsia-500/10" },
               { title: "Learning Streak", value: `${studentData.streak} Days`, icon: <Flame className="text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)] animate-pulse" size={28}/>, glow: "shadow-orange-500/10" }
             ].map((stat, i) => (
-              <motion.div key={i} variants={slideUpItem}
-                className={`bg-slate-900/40 backdrop-blur-xl p-6 rounded-3xl border border-slate-700/50 flex items-center justify-between shadow-xl ${stat.glow} hover:bg-slate-800/60 transition-colors cursor-default`}
-              >
+              <motion.div key={i} variants={slideUpItem} className={`bg-slate-900/40 backdrop-blur-xl p-6 rounded-3xl border border-slate-700/50 flex items-center justify-between shadow-xl ${stat.glow} hover:bg-slate-800/60 transition-colors cursor-default`}>
                 <div>
                   <p className="text-slate-400 font-semibold mb-1 uppercase tracking-wider text-xs">{stat.title}</p>
                   <p className="text-4xl font-black text-white tracking-tight">{stat.value}</p>
@@ -110,56 +104,67 @@ export default function App() {
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Neural Competency Analytics */}
-            <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }} 
-              className="md:col-span-2 bg-slate-900/40 backdrop-blur-xl p-8 rounded-[2rem] border border-slate-700/50 shadow-2xl relative overflow-hidden"
-            >
+            <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }} className="md:col-span-2 bg-slate-900/40 backdrop-blur-xl p-8 rounded-[2rem] border border-slate-700/50 shadow-2xl relative overflow-hidden">
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-[80px] rounded-full"></div>
-              <h2 className="text-2xl font-bold text-white mb-8 flex items-center tracking-tight">
-                <Brain className="mr-3 text-cyan-400"/> Neural Mastery Matrix
-              </h2>
+              <h2 className="text-2xl font-bold text-white mb-8 flex items-center tracking-tight"><Brain className="mr-3 text-cyan-400"/> Neural Mastery Matrix</h2>
               <div className="space-y-8 relative z-10">
                 {studentData.skills.map((skill) => (
                   <div key={skill.name + skill.mastery}>
-                    <div className="flex justify-between mb-3">
-                      <span className="font-bold text-slate-300 text-lg">{skill.name}</span>
-                      <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">{skill.mastery}%</span>
-                    </div>
+                    <div className="flex justify-between mb-3"><span className="font-bold text-slate-300 text-lg">{skill.name}</span><span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">{skill.mastery}%</span></div>
                     <div className="w-full bg-slate-950 rounded-full h-4 p-1 border border-slate-800 shadow-inner">
-                      <motion.div 
-                        initial={{ width: 0 }} animate={{ width: `${skill.mastery}%` }} transition={{ duration: 1.5, type: "spring" }}
-                        className={`h-full rounded-full bg-gradient-to-r ${skill.color} shadow-lg ${skill.shadow} relative`}
-                      >
-                         <div className="absolute top-0 right-0 bottom-0 w-10 bg-gradient-to-r from-transparent to-white/30 rounded-full"></div>
-                      </motion.div>
+                      <motion.div initial={{ width: 0 }} animate={{ width: `${skill.mastery}%` }} transition={{ duration: 1.5, type: "spring" }} className={`h-full rounded-full bg-gradient-to-r ${skill.color} shadow-lg ${skill.shadow} relative`}><div className="absolute top-0 right-0 bottom-0 w-10 bg-gradient-to-r from-transparent to-white/30 rounded-full"></div></motion.div>
                     </div>
                   </div>
                 ))}
               </div>
             </motion.div>
 
-            {/* Premium Action Card */}
-            <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }}
-              className="group relative p-[1px] rounded-[2rem] overflow-hidden bg-gradient-to-b from-fuchsia-500 to-cyan-500 shadow-[0_0_40px_rgba(217,70,239,0.3)] hover:shadow-[0_0_60px_rgba(217,70,239,0.5)] transition-all duration-500"
-            >
+            <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }} className="group relative p-[1px] rounded-[2rem] overflow-hidden bg-gradient-to-b from-fuchsia-500 to-cyan-500 shadow-[0_0_40px_rgba(217,70,239,0.3)] hover:shadow-[0_0_60px_rgba(217,70,239,0.5)] transition-all duration-500">
               <div className="absolute inset-0 bg-gradient-to-b from-fuchsia-500 to-cyan-500 opacity-50 group-hover:opacity-100 transition-opacity duration-500"></div>
               <div className="relative h-full bg-[#0F1423] p-8 rounded-[2rem] flex flex-col justify-center items-center text-center">
-                <motion.div animate={{ rotate: 360 }} transition={{ duration: 20, repeat: Infinity, ease: "linear" }} className="bg-gradient-to-br from-fuchsia-500/20 to-cyan-500/20 p-5 rounded-full mb-6 border border-white/10">
-                  <Activity size={48} className="text-fuchsia-400" />
-                </motion.div>
+                <motion.div animate={{ rotate: 360 }} transition={{ duration: 20, repeat: Infinity, ease: "linear" }} className="bg-gradient-to-br from-fuchsia-500/20 to-cyan-500/20 p-5 rounded-full mb-6 border border-white/10"><Activity size={48} className="text-fuchsia-400" /></motion.div>
                 <h3 className="text-3xl font-black text-white mb-3 tracking-tight">Initialize Assessment</h3>
-                <p className="text-slate-400 mb-8 font-medium leading-relaxed">Our quantum AI engine will calibrate questions to your exact neural frequency in real-time.</p>
-                <button onClick={startTest} className="w-full py-5 bg-white text-[#0B0F19] font-black text-lg rounded-2xl shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:scale-105 transition-all duration-300 flex justify-center items-center group/btn">
-                  <Play className="mr-2 group-hover/btn:text-fuchsia-500 transition-colors" fill="currentColor" size={22}/> Start Test
-                </button>
+                <p className="text-slate-400 mb-8 font-medium leading-relaxed">Our AI engine will calibrate questions to your neural frequency in real-time.</p>
+                <button onClick={startTest} className="w-full py-5 bg-white text-[#0B0F19] font-black text-lg rounded-2xl shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:scale-105 transition-all duration-300 flex justify-center items-center group/btn"><Play className="mr-2 group-hover/btn:text-fuchsia-500 transition-colors" fill="currentColor" size={22}/> Launch Protocol</button>
               </div>
             </motion.div>
           </div>
+
+          {/* NEW: DYNAMIC STRENGTHS & WEAKNESSES SECTION */}
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Strength Card */}
+            <div className="bg-emerald-950/20 backdrop-blur-xl p-8 rounded-[2rem] border border-emerald-900/30 shadow-[0_0_30px_rgba(16,185,129,0.05)] flex items-center space-x-6 hover:bg-emerald-950/40 transition-colors">
+              <div className="bg-emerald-500/20 p-4 rounded-2xl shadow-[0_0_15px_rgba(16,185,129,0.4)]">
+                <Zap className="text-emerald-400" size={36} />
+              </div>
+              <div>
+                <h4 className="text-emerald-500 font-bold uppercase tracking-widest text-xs mb-1">Greatest Strength</h4>
+                <p className="text-3xl font-black text-white">{topSkill.name}</p>
+                <p className="text-slate-400 font-medium mt-1">Exceptional mastery at <span className="text-emerald-400">{topSkill.mastery}%</span>.</p>
+              </div>
+            </div>
+
+            {/* Focus Area Card */}
+            <div className="bg-rose-950/20 backdrop-blur-xl p-8 rounded-[2rem] border border-rose-900/30 shadow-[0_0_30px_rgba(244,63,94,0.05)] flex items-center space-x-6 hover:bg-rose-950/40 transition-colors">
+              <div className="bg-rose-500/20 p-4 rounded-2xl shadow-[0_0_15px_rgba(244,63,94,0.4)]">
+                <AlertTriangle className="text-rose-400" size={36} />
+              </div>
+              <div>
+                <h4 className="text-rose-500 font-bold uppercase tracking-widest text-xs mb-1">Primary Focus Area</h4>
+                <p className="text-3xl font-black text-white">{bottomSkill.name}</p>
+                <p className="text-slate-400 font-medium mt-1">Currently at <span className="text-rose-400">{bottomSkill.mastery}%</span>. Needs attention.</p>
+              </div>
+            </div>
+
+          </motion.div>
+
         </div>
       </div>
     );
   }
 
+  // ... (The rest of the code remains exactly the same for Active Test and Results views) ...
   // --- ACTIVE TEST VIEW ---
   if (currentView === 'test') {
     const currentQuestion = mockQuestions[currentIndex];
@@ -214,7 +219,6 @@ export default function App() {
     
     return (
       <div className="min-h-screen bg-[#0B0F19] flex flex-col items-center py-16 px-6 font-sans text-white relative overflow-hidden">
-        {/* Glow Effects */}
         <div className={`fixed top-0 w-[600px] h-[600px] rounded-full blur-[150px] opacity-20 pointer-events-none ${isSuccess ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
 
         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-4xl relative z-10">
@@ -227,7 +231,6 @@ export default function App() {
             <p className="text-xl text-slate-400 font-medium">Session ID: <span className="text-cyan-400 font-mono">#{Math.random().toString(36).substr(2, 9).toUpperCase()}</span></p>
           </div>
 
-          {/* Premium Score Card */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
              <motion.div initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className={`p-[1px] rounded-[2.5rem] bg-gradient-to-b ${isSuccess ? 'from-emerald-400 to-teal-600 shadow-[0_0_40px_rgba(16,185,129,0.2)]' : 'from-red-400 to-rose-600 shadow-[0_0_40px_rgba(244,63,94,0.2)]'}`}>
                 <div className="bg-[#0B0F19]/90 backdrop-blur-xl h-full p-10 rounded-[2.5rem] flex flex-col items-center justify-center text-center">
@@ -247,14 +250,12 @@ export default function App() {
              </motion.div>
           </div>
 
-          {/* STAGGERED Performance Review */}
           <div className="mb-12">
             <h2 className="text-3xl font-black mb-8 flex items-center text-white"><Brain className="mr-4 text-fuchsia-400" size={36}/> Test Analysis</h2>
             <motion.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-6">
               {answerHistory.map((item, index) => (
                 <motion.div variants={slideUpItem} key={index} className={`p-8 rounded-[2rem] border relative overflow-hidden backdrop-blur-md transition-all hover:scale-[1.01] ${item.isCorrect ? 'bg-emerald-950/20 border-emerald-900/50 shadow-[0_0_30px_rgba(16,185,129,0.05)]' : 'bg-red-950/20 border-red-900/50 shadow-[0_0_30px_rgba(244,63,94,0.05)]'}`}>
                   
-                  {/* Glowing Status Bar on the left */}
                   <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${item.isCorrect ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]' : 'bg-red-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]'}`}></div>
 
                   <div className="flex items-start justify-between mb-6 pl-4">
